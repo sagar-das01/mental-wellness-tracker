@@ -1,0 +1,6 @@
+# Ignore secret configuration
+.env
+
+# Ignore system files
+.DS_Store
+*.log
