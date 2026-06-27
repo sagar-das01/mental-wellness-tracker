@@ -76,7 +76,9 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast, s
     }
     setErrorMsg('');
 
-    const redirectUri = window.location.origin + '/';
+    const redirectUri = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? `http://localhost:${window.location.port || '5174'}/`
+      : window.location.origin + '/';
     const scopes = [
       'user-read-playback-state',
       'user-modify-playback-state',
