@@ -188,33 +188,58 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast, s
   return (
     <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
       <h3 className="card-title" style={{ fontSize: '1rem', marginBottom: '16px' }}>
-        🎵 Spotify Web Control
+        🎵 Calm Music (Spotify)
       </h3>
 
       {!token ? (
-        // Login View
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        // DEFAULT STATE: Render direct embedded Spotify player (no active device required to listen)
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            Connect your personal Spotify account to control your playback and play soothing wellness playlists directly from the app.
+            Listen to calming lo-fi beats directly in your browser:
           </div>
 
-          {!spotifyClientId && (
-            <div style={{ color: '#f59e0b', fontSize: '0.75rem', fontWeight: 600, padding: '10px', background: 'rgba(245, 158, 11, 0.05)', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-              ⚠️ Spotify Client ID is not configured on this server. Add SPOTIFY_CLIENT_ID to your local .env file.
-            </div>
-          )}
+          <div style={{ borderRadius: '12px', overflow: 'hidden', background: '#000', border: '1px solid var(--border-color)', height: '152px' }}>
+            <iframe
+              src="https://open.spotify.com/embed/playlist/37i9dQZF1DWZeKFBqXMLi1"
+              width="100%"
+              height="152"
+              frameBorder="0"
+              allowFullScreen=""
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+              style={{ border: 'none' }}
+            ></iframe>
+          </div>
 
-          {errorMsg && <div style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 600 }}>⚠️ {errorMsg}</div>}
-
-          <button 
-            type="button" 
-            onClick={handleConnect}
-            className="submit-btn" 
-            disabled={!spotifyClientId}
-            style={{ margin: 0, padding: '8px', fontSize: '0.85rem', background: '#1DB954' }}
-          >
-            Connect Spotify Account
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+            <button 
+              type="button" 
+              onClick={handleConnect}
+              className="btn-secondary"
+              disabled={!spotifyClientId}
+              style={{ 
+                margin: 0, 
+                padding: '8px 16px', 
+                fontSize: '0.75rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px',
+                border: '1px solid var(--border-color)',
+                background: 'rgba(255,255,255,0.02)',
+                cursor: spotifyClientId ? 'pointer' : 'not-allowed'
+              }}
+            >
+              🔌 Link Spotify (for Remote Device Control)
+            </button>
+            
+            {!spotifyClientId && (
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                💡 Add `SPOTIFY_CLIENT_ID` to `.env` to enable remote playback controls.
+              </span>
+            )}
+            
+            {errorMsg && <div style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 600, textAlign: 'center', marginTop: '4px' }}>⚠️ {errorMsg}</div>}
+          </div>
         </div>
       ) : (
         // Connected Control View
