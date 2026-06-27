@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 
@@ -63,6 +63,12 @@ def init_db():
             created_at TEXT NOT NULL
         )
         ''')
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        ''')
     else:
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS wellness_logs (
@@ -73,6 +79,12 @@ def init_db():
             notes TEXT NOT NULL,
             insights TEXT,
             created_at TEXT NOT NULL
+        )
+        ''')
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
         )
         ''')
         
@@ -145,3 +157,78 @@ def delete_log(log_id: int) -> bool:
     conn.commit()
     conn.close()
     return True
+
+# Settings Management
+def set_setting(key: str, value: str):
+    conn = get_db_connection()
+    cursor = get_cursor(conn)
+    
+    if IS_POSTGRES:
+        execute_query(
+            cursor,
+            "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+            (key, value)
+        )
+    else:
+        execute_query(
+            cursor,
+            "INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)",
+            (key, value)
+        )
+    conn.commit()
+    conn.close()
+
+def get_setting(key: str, default: str = "") -> str:
+    conn = get_db_connection()
+    cursor = get_cursor(conn)
+    execute_query(cursor, "SELECT value FROM app_settings WHERE key = ?", (key,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        return row["value"]
+    return default
+
+# Data Retention Pruning
+def prune_logs() -> int:
+    retention_days_str = get_setting("data_retention_days", "0")
+    try:
+        retention_days = int(retention_days_str)
+    except ValueError:
+        return 0
+        
+    if retention_days <= 0:
+        return 0  # Keep forever
+        
+    cutoff_date = (datetime.utcnow() - timedelta(days=retention_days)).isoformat()
+    
+    conn = get_db_connection()
+    cursor = get_cursor(conn)
+    
+    if IS_POSTGRES:
+        # Get count
+        execute_query(cursor, "SELECT COUNT(*) as count FROM wellness_logs WHERE created_at < ?", (cutoff_date,))
+        row = cursor.fetchone()
+        count = row["count"] if row else 0
+        
+        if count > 0:
+            execute_query(cursor, "DELETE FROM wellness_logs WHERE created_at < ?", (cutoff_date,))
+            conn.commit()
+    else:
+        execute_query(cursor, "SELECT COUNT(*) as count FROM wellness_logs WHERE created_at < ?", (cutoff_date,))
+        row = cursor.fetchone()
+        count = row["count"] if row else 0
+        
+        if count > 0:
+            execute_query(cursor, "DELETE FROM wellness_logs WHERE created_at < ?", (cutoff_date,))
+            conn.commit()
+            
+    conn.close()
+    return count
+
+def purge_all_logs():
+    conn = get_db_connection()
+    cursor = get_cursor(conn)
+    execute_query(cursor, "DELETE FROM wellness_logs")
+    conn.commit()
+    conn.close()

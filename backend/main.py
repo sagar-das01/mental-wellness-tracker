@@ -83,6 +83,24 @@ def spotify_callback(request: SpotifyCallbackRequest):
             raise HTTPException(status_code=response.status_code, detail=response.text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+class RetentionUpdateRequest(BaseModel):
+    retention_days: int = Field(..., ge=0)
+
+@app.get("/api/retention")
+def get_retention():
+    val = db.get_setting("data_retention_days", "0")
+    return {"retention_days": int(val)}
+
+@app.post("/api/retention")
+def update_retention(request: RetentionUpdateRequest):
+    db.set_setting("data_retention_days", str(request.retention_days))
+    pruned = db.prune_logs()
+    return {"status": "success", "pruned_count": pruned}
+
+@app.post("/api/logs/purge")
+def purge_logs():
+    db.purge_all_logs()
+    return {"status": "success"}
 
 @app.get("/api/logs")
 def list_logs():
@@ -107,6 +125,9 @@ def create_log(request: LogCreateRequest, x_gemini_api_key: Optional[str] = Head
         notes=request.notes,
         insights=insights
     )
+    
+    # 3. Enforce data retention pruning in real-time
+    db.prune_logs()
     
     return new_log
 

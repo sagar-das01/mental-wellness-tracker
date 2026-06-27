@@ -91,11 +91,13 @@ function App() {
   const [streak, setStreak] = useState(0);
   const [promptIdx, setPromptIdx] = useState(0);
   const [spotifyClientId, setSpotifyClientId] = useState('');
+  const [retentionDays, setRetentionDays] = useState(0);
 
   useEffect(() => {
     checkHealth();
     fetchLogs();
     fetchConfig();
+    fetchRetention();
     // Randomize initial journal prompt
     setPromptIdx(Math.floor(Math.random() * REFLECTION_PROMPTS.length));
   }, []);
@@ -109,6 +111,18 @@ function App() {
       }
     } catch (e) {
       console.error('Failed to fetch config:', e);
+    }
+  };
+
+  const fetchRetention = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/retention`);
+      if (res.ok) {
+        const data = await res.json();
+        setRetentionDays(data.retention_days);
+      }
+    } catch (e) {
+      console.error('Failed to fetch retention settings:', e);
     }
   };
 
@@ -274,6 +288,59 @@ function App() {
     localStorage.removeItem('calmmind_gemini_key');
     setShowSettings(false);
     showToast('API Key cleared');
+  };
+
+  const handleUpdateRetention = async (days) => {
+    setRetentionDays(days);
+    try {
+      const res = await fetch(`${API_BASE}/retention`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ retention_days: days })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.pruned_count > 0) {
+          showToast(`Retention updated! Pruned ${data.pruned_count} older check-in(s).`);
+          fetchLogs();
+        } else {
+          showToast('Data retention policy updated.');
+        }
+      }
+    } catch (e) {
+      console.error('Failed to update retention:', e);
+      showToast('Failed to update retention policy');
+    }
+  };
+
+  const handleExportData = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(logs, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `calmmind_wellness_history_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast('All wellness check-ins exported!');
+  };
+
+  const handlePurgeLogs = async () => {
+    if (!window.confirm("⚠️ WARNING: This will permanently delete all your journaling logs and cannot be undone. Are you sure you want to proceed?")) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/logs/purge`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        setLogs([]);
+        setShowSettings(false);
+        showToast('All data permanently deleted');
+      }
+    } catch (e) {
+      console.error('Failed to purge data:', e);
+      showToast('Failed to delete data');
+    }
   };
 
   const moods = [
@@ -541,6 +608,55 @@ function App() {
               <span className="form-help">
                 Your key is stored locally in your browser and used only to query the Gemini models. Leave empty to use the server's default configuration or the built-in wellness insights mock generator.
               </span>
+            </div>
+
+            <div className="form-group" style={{ marginTop: '16px' }}>
+              <label className="form-label">📅 Data Retention Policy</label>
+              <select
+                className="form-input"
+                value={retentionDays}
+                onChange={(e) => handleUpdateRetention(parseInt(e.target.value))}
+                style={{ 
+                  width: '100%', 
+                  height: '38px', 
+                  background: 'rgba(0,0,0,0.3)', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '6px', 
+                  color: '#fff', 
+                  padding: '0 8px',
+                  fontSize: '0.85rem'
+                }}
+              >
+                <option value={0}>Keep Forever (Default)</option>
+                <option value={30}>Keep Last 30 Days</option>
+                <option value={90}>Keep Last 90 Days</option>
+                <option value={365}>Keep Last 1 Year</option>
+              </select>
+              <span className="form-help">
+                Wellness logs older than this duration will be automatically pruned. Adjusting this policy triggers an immediate database cleanup.
+              </span>
+            </div>
+
+            <div className="form-group" style={{ marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+              <label className="form-label">🔒 Data Privacy & Portability</label>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleExportData}
+                  style={{ flex: 1, padding: '8px', fontSize: '0.8rem', cursor: 'pointer' }}
+                >
+                  📥 Export Logs (JSON)
+                </button>
+                <button
+                  type="button"
+                  className="log-delete-btn"
+                  onClick={handlePurgeLogs}
+                  style={{ flex: 1, padding: '8px', fontSize: '0.8rem', background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}
+                >
+                  ⚠️ Purge All Data
+                </button>
+              </div>
             </div>
 
             <div className="modal-footer">
