@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import WellnessChart from './components/WellnessChart';
+import AmbientPlayer from './components/AmbientPlayer';
+
+const REFLECTION_PROMPTS = [
+  "What is one small thing that brought you peace or joy today?",
+  "Describe a moment of kindness you witnessed or experienced recently.",
+  "What is a challenge you faced today, and how did you navigate it?",
+  "Write about something you are looking forward to in the coming days.",
+  "What does your body or mind need right now (e.g., rest, hydration, pause)?",
+  "Name three things you are grateful for today.",
+  "If today had a color or a weather pattern, what would it be and why?"
+];
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
@@ -74,16 +86,21 @@ function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [openLogId, setOpenLogId] = useState(null);
 
-  // Statistics
+  // Statistics and Prompts
   const [stats, setStats] = useState({ avgMood: 0, avgSleep: 0, avgStress: 0 });
+  const [streak, setStreak] = useState(0);
+  const [promptIdx, setPromptIdx] = useState(0);
 
   useEffect(() => {
     checkHealth();
     fetchLogs();
+    // Randomize initial journal prompt
+    setPromptIdx(Math.floor(Math.random() * REFLECTION_PROMPTS.length));
   }, []);
 
   useEffect(() => {
     calculateStats(logs);
+    calculateStreak(logs);
   }, [logs]);
 
   const showToast = (msg) => {
@@ -115,6 +132,41 @@ function App() {
       console.error('Failed to fetch logs:', e);
       setBackendHealthy(false);
     }
+  };
+
+  const calculateStreak = (currentLogs) => {
+    if (!currentLogs || currentLogs.length === 0) {
+      setStreak(0);
+      return;
+    }
+    
+    // Extract unique dates formatted as YYYY-MM-DD
+    const dates = currentLogs.map(l => l.created_at.split('T')[0]);
+    const uniqueDates = [...new Set(dates)].sort((a, b) => new Date(b) - new Date(a));
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    
+    // If the latest check-in date is neither today nor yesterday, streak is 0
+    if (uniqueDates[0] !== todayStr && uniqueDates[0] !== yesterdayStr) {
+      setStreak(0);
+      return;
+    }
+    
+    let currentStreak = 1;
+    for (let i = 0; i < uniqueDates.length - 1; i++) {
+      const current = new Date(uniqueDates[i]);
+      const next = new Date(uniqueDates[i + 1]);
+      const diffTime = Math.abs(current - next);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        currentStreak++;
+      } else if (diffDays > 1) {
+        break; // Streak broken
+      }
+    }
+    setStreak(currentStreak);
   };
 
   const calculateStats = (currentLogs) => {
@@ -310,6 +362,24 @@ function App() {
                 />
               </div>
 
+              {/* Journal Prompt Suggestion */}
+              <div className="form-group" style={{ background: 'rgba(139, 92, 246, 0.05)', padding: '14px', borderRadius: '10px', border: '1px dashed rgba(139, 92, 246, 0.15)', position: 'relative' }}>
+                <span className="section-label" style={{ fontSize: '0.65rem', color: '#8b5cf6', display: 'block', marginBottom: '4px' }}>💡 AI Journaling Prompt</span>
+                <p style={{ fontSize: '0.85rem', color: '#f3f4f6', paddingRight: '24px', lineHeight: '1.4' }}>
+                  "{REFLECTION_PROMPTS[promptIdx]}"
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setPromptIdx((prev) => (prev + 1) % REFLECTION_PROMPTS.length)}
+                  style={{
+                    position: 'absolute', right: '12px', top: '12px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: 0
+                  }}
+                  title="Shuffle Prompt"
+                >
+                  🔄
+                </button>
+              </div>
+
               {/* Journal Notes */}
               <div className="form-group">
                 <label className="form-label">Journal Notes / Thoughts</label>
@@ -332,7 +402,7 @@ function App() {
           <div className="animate-fade" style={{ animationDelay: '0.1s' }}>
             
             {/* Stats Summary Cards */}
-            <div className="stats-summary">
+            <div className="stats-summary" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
               <div className="stat-item">
                 <span className="stat-val">{stats.avgMood || '-'}</span>
                 <span className="stat-label">Avg Mood (1-5)</span>
@@ -345,7 +415,19 @@ function App() {
                 <span className="stat-val">{stats.avgStress || '-'}</span>
                 <span className="stat-label">Avg Stress (1-5)</span>
               </div>
+              <div className="stat-item" style={{ borderColor: 'rgba(139, 92, 246, 0.2)' }}>
+                <span className="stat-val" style={{ background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  🔥 {streak}
+                </span>
+                <span className="stat-label">Streak (Days)</span>
+              </div>
             </div>
+
+            {/* Wellness Charts */}
+            <WellnessChart logs={logs} />
+
+            {/* Ambient Soundscapes */}
+            <AmbientPlayer />
 
             {/* Check-In History Logs */}
             <div className="logs-section">
