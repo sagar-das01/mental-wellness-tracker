@@ -21,7 +21,7 @@ graph TD
     ReactApp -->|HTTP Requests| FastAPI[FastAPI Backend Server]
     
     %% Backend Modules
-    subgraph FastAPI Backend App
+    subgraph FastAPIApp ["FastAPI Backend App"]
         direction TB
         Endpoints[API Router /api/logs] --> ConnectionMgr[Database Connection Manager]
         Endpoints --> AIEngine[AI Insight Generator]
@@ -36,7 +36,7 @@ graph TD
     AIEngine -->|Fallback if Key Fails/Missing| MockGenerator[Mock Insight Generator]
 
     %% GCP Deployment Architecture
-    subgraph Google Cloud Platform (Production Deployment)
+    subgraph GCP ["Google Cloud Platform (Production Deployment)"]
         direction LR
         CloudRun[Google Cloud Run Container]
         SecretManager[GCP Secret Manager] -->|Mounts Secrets| CloudRun
