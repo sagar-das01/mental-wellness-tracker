@@ -1,4 +1,6 @@
 import os
+import base64
+import requests
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -45,6 +47,42 @@ def get_config():
     return {
         "spotify_client_id": os.environ.get("SPOTIFY_CLIENT_ID", "")
     }
+
+class SpotifyCallbackRequest(BaseModel):
+    code: str
+    redirect_uri: str
+
+@app.post("/api/spotify/callback")
+def spotify_callback(request: SpotifyCallbackRequest):
+    client_id = os.environ.get("SPOTIFY_CLIENT_ID")
+    client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET")
+    
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=500, detail="Spotify credentials are not configured on the server.")
+        
+    token_url = "https://accounts.spotify.com/api/token"
+    
+    auth_header = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("utf-8")
+    
+    headers = {
+        "Authorization": f"Basic {auth_header}",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    
+    data = {
+        "grant_type": "authorization_code",
+        "code": request.code,
+        "redirect_uri": request.redirect_uri
+    }
+    
+    try:
+        response = requests.post(token_url, headers=headers, data=data)
+        if response.ok:
+            return response.json()
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/logs")
 def list_logs():

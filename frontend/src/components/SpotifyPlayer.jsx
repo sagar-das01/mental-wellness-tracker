@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://127.0.0.1:8001/api' 
+    : window.location.origin + '/api');
+
 export default function SpotifyPlayer({ currentMood, currentStress, showToast, spotifyClientId }) {
   const [token, setToken] = useState(() => localStorage.getItem('spotify_access_token') || '');
   const [currentTrack, setCurrentTrack] = useState(null);
@@ -14,18 +19,43 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast, s
     { name: '😊 Sunny Vibes', id: '37i9dQZF1DX3rxZdIscKld' }
   ];
 
-  // Extract token from URL hash on redirect
+  // Extract auth code from URL query params and exchange for access token
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash) {
-      const params = new URLSearchParams(hash.substring(1));
-      const accessToken = params.get('access_token');
-      if (accessToken) {
-        setToken(accessToken);
-        localStorage.setItem('spotify_access_token', accessToken);
-        window.location.hash = ''; // Clear hash
-        if (showToast) showToast('Successfully connected to Spotify! 🎵');
-      }
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    
+    if (code) {
+      setErrorMsg('');
+      fetch(`${API_BASE}/spotify/callback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          redirect_uri: window.location.origin + '/'
+        })
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('Authorization code exchange failed');
+        return res.json();
+      })
+      .then(data => {
+        if (data.access_token) {
+          setToken(data.access_token);
+          localStorage.setItem('spotify_access_token', data.access_token);
+          
+          // Clear query parameters from URL without reloading
+          const newUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+          
+          if (showToast) showToast('Successfully connected to Spotify! 🎵');
+        } else {
+          setErrorMsg('Failed to exchange code for token.');
+        }
+      })
+      .catch(err => {
+        console.error('Error exchanging token:', err);
+        setErrorMsg('Error exchanging code for token. Check server configurations.');
+      });
     }
   }, []);
 
@@ -53,8 +83,8 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast, s
       'user-read-currently-playing'
     ].join('%20');
 
-    // Redirect to Spotify Auth page
-    window.location.href = `https://accounts.spotify.com/authorize?client_id=${spotifyClientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}`;
+    // Redirect to Spotify Auth page (Authorization Code Flow)
+    window.location.href = `https://accounts.spotify.com/authorize?client_id=${spotifyClientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}`;
   };
 
   const handleDisconnect = () => {
