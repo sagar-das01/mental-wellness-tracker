@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import WellnessChart from './components/WellnessChart';
-import AmbientPlayer from './components/AmbientPlayer';
 import SpotifyPlayer from './components/SpotifyPlayer';
 
 const REFLECTION_PROMPTS = [
@@ -440,9 +439,6 @@ function App() {
 
             {/* Wellness Charts */}
             <WellnessChart logs={logs} />
-
-            {/* Ambient Soundscapes */}
-            <AmbientPlayer />
 
             {/* Spotify Player */}
             <SpotifyPlayer currentMood={mood} currentStress={stressLevel} showToast={showToast} spotifyClientId={spotifyClientId} />
