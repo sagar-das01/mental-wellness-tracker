@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://127.0.0.1:8001/api' 
+    ? 'http://127.0.0.1:8000/api' 
     : window.location.origin + '/api');
 
 export default function SpotifyPlayer({ currentMood, currentStress, showToast, spotifyClientId }) {
   const [token, setToken] = useState(() => localStorage.getItem('spotify_access_token') || '');
+  const [refreshToken, setRefreshToken] = useState(() => localStorage.getItem('spotify_refresh_token') || '');
   const [currentTrack, setCurrentTrack] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,6 +24,7 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast, s
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
+    const state = params.get('state');
     
     if (code) {
       setErrorMsg('');
@@ -42,6 +44,14 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast, s
         if (data.access_token) {
           setToken(data.access_token);
           localStorage.setItem('spotify_access_token', data.access_token);
+          if (data.refresh_token) {
+            setRefreshToken(data.refresh_token);
+            localStorage.setItem('spotify_refresh_token', data.refresh_token);
+          }
+          if (data.expires_in) {
+            const expiry = Date.now() + (data.expires_in * 1000);
+            localStorage.setItem('spotify_token_expiry', String(expiry));
+          }
           
           // Clear query parameters from URL without reloading
           const newUrl = window.location.origin + window.location.pathname;
@@ -56,6 +66,16 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast, s
         console.error('Error exchanging token:', err);
         setErrorMsg('Error exchanging code for token. Check server configurations.');
       });
+    }
+  }, []);
+
+  useEffect(() => {
+    const refreshExpiry = Number(localStorage.getItem('spotify_token_expiry') || '0');
+    const refreshStored = localStorage.getItem('spotify_refresh_token') || '';
+    if (!token && refreshStored) {
+      if (!refreshExpiry || Date.now() > refreshExpiry - 60000) {
+        refreshAccessToken(refreshStored);
+      }
     }
   }, []);
 
@@ -77,7 +97,7 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast, s
     setErrorMsg('');
 
     const redirectUri = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? `http://127.0.0.1:${window.location.port || '5174'}/`
+      ? `${window.location.origin}/`
       : window.location.origin + '/';
     const scopes = [
       'user-read-playback-state',
@@ -86,14 +106,48 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast, s
     ].join('%20');
 
     // Redirect to Spotify Auth page (Authorization Code Flow)
-    window.location.href = `https://accounts.spotify.com/authorize?client_id=${spotifyClientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}`;
+    window.location.href = `https://accounts.spotify.com/authorize?client_id=${spotifyClientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&show_dialog=true`;
   };
 
   const handleDisconnect = () => {
     setToken('');
+    setRefreshToken('');
     setCurrentTrack(null);
     localStorage.removeItem('spotify_access_token');
+    localStorage.removeItem('spotify_refresh_token');
+    localStorage.removeItem('spotify_token_expiry');
     if (showToast) showToast('Disconnected from Spotify.');
+  };
+
+  const refreshAccessToken = async (rt = refreshToken) => {
+    if (!rt) return;
+    try {
+      const res = await fetch(`${API_BASE}/spotify/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: rt })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.access_token) {
+          setToken(data.access_token);
+          localStorage.setItem('spotify_access_token', data.access_token);
+          if (data.refresh_token) {
+            setRefreshToken(data.refresh_token);
+            localStorage.setItem('spotify_refresh_token', data.refresh_token);
+          }
+          if (data.expires_in) {
+            const expiry = Date.now() + (data.expires_in * 1000);
+            localStorage.setItem('spotify_token_expiry', String(expiry));
+          }
+          return data.access_token;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to refresh Spotify token:', e);
+    }
+    handleDisconnect();
+    return null;
   };
 
   const fetchCurrentlyPlaying = async () => {
@@ -108,6 +162,12 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast, s
       }
       if (res.status === 401) {
         // Expired token
+        if (refreshToken) {
+          const fresh = await refreshAccessToken();
+          if (fresh) {
+            return fetchCurrentlyPlaying();
+          }
+        }
         handleDisconnect();
         return;
       }
@@ -235,6 +295,11 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast, s
             {!spotifyClientId && (
               <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center' }}>
                 💡 Add `SPOTIFY_CLIENT_ID` to `.env` to enable remote playback controls.
+              </span>
+            )}
+            {token && refreshToken && (
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                Spotify session is retained locally and will refresh automatically.
               </span>
             )}
             

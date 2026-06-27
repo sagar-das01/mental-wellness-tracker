@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import WellnessChart from './components/WellnessChart';
 import SpotifyPlayer from './components/SpotifyPlayer';
+import CalmChat from './components/CalmChat';
 
 const REFLECTION_PROMPTS = [
   "What is one small thing that brought you peace or joy today?",
@@ -13,9 +14,11 @@ const REFLECTION_PROMPTS = [
   "If today had a color or a weather pattern, what would it be and why?"
 ];
 
+const EXAM_TYPES = ['NEET', 'JEE', 'JEE-Advanced', 'CUET', 'CAT', 'GATE', 'UPSC'];
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://127.0.0.1:8001/api' 
+    ? 'http://127.0.0.1:8000/api' 
     : window.location.origin + '/api');
 
 // A simple and robust Markdown-to-HTML parser function to render wellness insights beautifully
@@ -86,12 +89,27 @@ function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [openLogId, setOpenLogId] = useState(null);
 
+  // Tabs and Report State
+  const [activeTab, setActiveTab] = useState('chat');
+  const [showReport, setShowReport] = useState(false);
+  const [reportContent, setReportContent] = useState('');
+  const [loadingReport, setLoadingReport] = useState(false);
+
   // Statistics, Prompts, and Config
   const [stats, setStats] = useState({ avgMood: 0, avgSleep: 0, avgStress: 0 });
   const [streak, setStreak] = useState(0);
   const [promptIdx, setPromptIdx] = useState(0);
   const [spotifyClientId, setSpotifyClientId] = useState('');
   const [retentionDays, setRetentionDays] = useState(0);
+  const [examType, setExamType] = useState('NEET');
+  const [daysToExam, setDaysToExam] = useState('');
+  const [studentName, setStudentName] = useState(() => localStorage.getItem('calmmind_student_name') || '');
+  const exampleInputs = [
+    'I am feeling overwhelmed by my syllabus today.',
+    'I slept only 5 hours and need help focusing.',
+    'Can you help me reframe my negative thoughts?',
+    'What is a 3-minute grounding exercise I can do now?',
+  ];
 
   useEffect(() => {
     checkHealth();
@@ -235,6 +253,8 @@ function App() {
           sleep_hours: parseFloat(sleepHours),
           stress_level: stressLevel,
           notes,
+          exam_type: examType,
+          days_to_exam: daysToExam === '' ? null : parseInt(daysToExam, 10),
         }),
       });
 
@@ -245,6 +265,7 @@ function App() {
         setMood(3);
         setSleepHours(7);
         setStressLevel(3);
+        setDaysToExam('');
         setOpenLogId(newLog.id); // Open the details of the latest log immediately
         showToast('Wellness check-in saved!');
       } else {
@@ -279,6 +300,7 @@ function App() {
 
   const handleSaveApiKey = () => {
     localStorage.setItem('calmmind_gemini_key', apiKey);
+    localStorage.setItem('calmmind_student_name', studentName);
     setShowSettings(false);
     showToast('API Key saved successfully!');
   };
@@ -343,6 +365,30 @@ function App() {
     }
   };
 
+  const handleGenerateReport = async () => {
+    setLoadingReport(true);
+    setReportContent('');
+    setShowReport(true);
+    try {
+      const headers = {};
+      if (apiKey) {
+        headers['X-Gemini-Api-Key'] = apiKey;
+      }
+      const res = await fetch(`${API_BASE}/reports/weekly`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setReportContent(data.report);
+      } else {
+        setReportContent("### Generate Digest Failed\nPlease complete at least one wellness check-in first to compile the report.");
+      }
+    } catch (e) {
+      console.error(e);
+      setReportContent("### Connection Error\nFailed to reach the weekly digest server.");
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
   const moods = [
     { rating: 1, emoji: '😢', label: 'Struggling' },
     { rating: 2, emoji: '🙁', label: 'Down' },
@@ -372,6 +418,44 @@ function App() {
           <span className="logo-title">CalmMind</span>
         </div>
 
+        {/* Navigation Tabs */}
+        <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '20px', border: '1px solid var(--border-color)' }}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('chat')}
+            style={{
+              background: activeTab === 'chat' ? 'linear-gradient(135deg, #8b5cf6, #06b6d4)' : 'transparent',
+              border: 'none',
+              color: '#fff',
+              padding: '6px 16px',
+              borderRadius: '16px',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            💬 Conversation
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('dashboard')}
+            style={{
+              background: activeTab === 'dashboard' ? 'linear-gradient(135deg, #8b5cf6, #06b6d4)' : 'transparent',
+              border: 'none',
+              color: '#fff',
+              padding: '6px 16px',
+              borderRadius: '16px',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            📝 Check-in
+          </button>
+        </div>
+
         <div className="nav-actions">
           <button className="btn-icon" onClick={() => setShowSettings(true)}>
             ⚙️
@@ -384,205 +468,185 @@ function App() {
         </div>
       </header>
 
-      {/* Dashboard Body */}
+      {/* Primary Body */}
       <main className="dashboard-container">
-        <div className="dashboard-grid">
-          
-          {/* Left Column: Check-in Form */}
-          <div className="glass-card checkin-card animate-fade">
-            <h2 className="card-title">🌱 Check In with Yourself</h2>
-            <form onSubmit={handleCheckIn}>
-              
-              {/* Mood Selection */}
-              <div className="form-group">
-                <label className="form-label">How are you feeling right now?</label>
-                <div className="mood-grid">
-                  {moods.map((m) => (
-                    <button
-                      key={m.rating}
-                      type="button"
-                      className={`mood-btn ${mood === m.rating ? 'selected' : ''}`}
-                      onClick={() => setMood(m.rating)}
-                    >
-                      <span className="mood-emoji">{m.emoji}</span>
-                      <span className="mood-label">{m.label}</span>
-                    </button>
-                  ))}
+        {activeTab === 'dashboard' ? (
+          <div className="chat-shell animate-fade">
+            <div className="glass-card">
+              <div className="compact-header">
+                <div>
+                  <h2 className="card-title" style={{ marginBottom: '8px' }}>CalmMind</h2>
+                  <p className="compact-subtitle">Quick check-in. Minimal inputs. Direct support.</p>
+                </div>
+                <div className="compact-actions">
+                  <button type="button" className="btn-secondary" onClick={() => setActiveTab('chat')}>Open analysis</button>
+                  <button type="button" className="btn-secondary" onClick={() => document.getElementById('spotify-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Spotify</button>
                 </div>
               </div>
 
-              {/* Sleep Slider */}
-              <div className="form-group">
-                <label className="form-label">
-                  Sleep Duration <span className="label-val">{sleepHours} Hours</span>
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="15"
-                  step="0.5"
-                  className="range-slider"
-                  value={sleepHours}
-                  onChange={(e) => setSleepHours(e.target.value)}
-                />
-              </div>
+              <form onSubmit={handleCheckIn}>
+                <div className="form-group">
+                  <label className="form-label">How are you feeling right now?</label>
+                  <div className="mood-grid">
+                    {moods.map((m) => (
+                      <button key={m.rating} type="button" className={`mood-btn ${mood === m.rating ? 'selected' : ''}`} onClick={() => setMood(m.rating)}>
+                        <span className="mood-emoji">{m.emoji}</span>
+                        <span className="mood-label">{m.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-              {/* Stress Level Selection */}
-              <div className="form-group">
-                <label className="form-label">
-                  Stress Level <span className="label-val">{stressLevel}/5</span>
-                </label>
-                <input
-                  type="range"
-                  min="1"
-                  max="5"
-                  step="1"
-                  className="range-slider"
-                  value={stressLevel}
-                  onChange={(e) => setStressLevel(e.target.value)}
-                />
-              </div>
+                <div className="form-group">
+                  <label className="form-label">Sleep and stress</label>
+                  <div className="compact-range-grid">
+                    <div>
+                      <span className="compact-range-label">Sleep <strong>{sleepHours}h</strong></span>
+                      <input type="range" min="0" max="15" step="0.5" className="range-slider" value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} />
+                    </div>
+                    <div>
+                      <span className="compact-range-label">Stress <strong>{stressLevel}/5</strong></span>
+                      <input type="range" min="1" max="5" step="1" className="range-slider" value={stressLevel} onChange={(e) => setStressLevel(e.target.value)} />
+                    </div>
+                  </div>
+                </div>
 
-              {/* Journal Prompt Suggestion */}
-              <div className="form-group" style={{ background: 'rgba(139, 92, 246, 0.05)', padding: '14px', borderRadius: '10px', border: '1px dashed rgba(139, 92, 246, 0.15)', position: 'relative' }}>
-                <span className="section-label" style={{ fontSize: '0.65rem', color: '#8b5cf6', display: 'block', marginBottom: '4px' }}>💡 AI Journaling Prompt</span>
-                <p style={{ fontSize: '0.85rem', color: '#f3f4f6', paddingRight: '24px', lineHeight: '1.4' }}>
-                  "{REFLECTION_PROMPTS[promptIdx]}"
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setPromptIdx((prev) => (prev + 1) % REFLECTION_PROMPTS.length)}
-                  style={{
-                    position: 'absolute', right: '12px', top: '12px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: 0
-                  }}
-                  title="Shuffle Prompt"
-                >
-                  🔄
+                <div className="form-group">
+                  <label className="form-label">Exam context</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <select className="form-input" value={examType} onChange={(e) => setExamType(e.target.value)}>
+                      {EXAM_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                    <input type="number" min="0" className="form-input" placeholder="Days to exam" value={daysToExam} onChange={(e) => setDaysToExam(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Example inputs</label>
+                  <div className="example-grid">
+                    {exampleInputs.map((item) => (
+                      <button key={item} type="button" className="example-chip" onClick={() => setNotes(item)}>
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Journal notes</label>
+                  <textarea className="form-textarea" placeholder="What is on your mind?" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={loading} />
+                </div>
+
+                <button type="submit" className="submit-btn" disabled={loading}>
+                  {loading ? 'Analyzing with AI...' : 'Send check-in'}
                 </button>
-              </div>
-
-              {/* Journal Notes */}
-              <div className="form-group">
-                <label className="form-label">Journal Notes / Thoughts</label>
-                <textarea
-                  className="form-textarea"
-                  placeholder="What is on your mind? How was your day? Write down any reflections or stressors..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  disabled={loading}
-                />
-              </div>
-
-              <button type="submit" className="submit-btn" disabled={loading}>
-                {loading ? 'Analyzing with AI...' : 'Complete Check-In ✨'}
-              </button>
-            </form>
-          </div>
-
-          {/* Right Column: Stats & Log History */}
-          <div className="animate-fade" style={{ animationDelay: '0.1s' }}>
-            
-            {/* Stats Summary Cards */}
-            <div className="stats-summary" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-              <div className="stat-item">
-                <span className="stat-val">{stats.avgMood || '-'}</span>
-                <span className="stat-label">Avg Mood (1-5)</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-val">{stats.avgSleep ? `${stats.avgSleep}h` : '-'}</span>
-                <span className="stat-label">Avg Sleep</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-val">{stats.avgStress || '-'}</span>
-                <span className="stat-label">Avg Stress (1-5)</span>
-              </div>
-              <div className="stat-item" style={{ borderColor: 'rgba(139, 92, 246, 0.2)' }}>
-                <span className="stat-val" style={{ background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                  🔥 {streak}
-                </span>
-                <span className="stat-label">Streak (Days)</span>
-              </div>
+              </form>
             </div>
 
-            {/* Wellness Charts */}
-            <WellnessChart logs={logs} />
+            <div className="glass-card" id="spotify-panel" style={{ marginTop: '20px' }}>
+              <h3 className="card-title" style={{ marginBottom: '12px' }}>Spotify</h3>
+              <SpotifyPlayer currentMood={mood} currentStress={stressLevel} showToast={showToast} spotifyClientId={spotifyClientId} />
+            </div>
 
-            {/* Spotify Player */}
-            <SpotifyPlayer currentMood={mood} currentStress={stressLevel} showToast={showToast} spotifyClientId={spotifyClientId} />
-
-            {/* Check-In History Logs */}
-            <div className="logs-section">
-              <h3 className="card-title">📖 Your Wellness History</h3>
-              {logs.length === 0 ? (
-                <div className="glass-card empty-logs-card">
-                  <span className="empty-icon">🌱</span>
-                  <p>No check-ins yet. Take your first check-in to begin tracking your wellness journey!</p>
-                </div>
+            <div className="glass-card" style={{ marginTop: '20px' }}>
+              <h3 className="card-title" style={{ marginBottom: '12px' }}>Latest response</h3>
+              {logs.length > 0 && logs[0].insights ? (
+                <div className="markdown-content" dangerouslySetInnerHTML={{ __html: parseMarkdown(logs[0].insights) }} />
               ) : (
-                logs.map((log) => (
-                  <div
-                    key={log.id}
-                    className={`log-card ${openLogId === log.id ? 'open' : ''}`}
-                  >
-                    {/* Collapsed Header */}
-                    <div
-                      className="log-header"
-                      onClick={() => setOpenLogId(openLogId === log.id ? null : log.id)}
-                    >
-                      <div className="log-meta">
-                        <span className="log-mood-emoji">
-                          {moods.find((m) => m.rating === log.mood)?.emoji || '😐'}
-                        </span>
-                        <div className="log-date-wrapper">
-                          <span className="log-date">{formatDate(log.created_at)}</span>
-                          <span className="log-time">{formatTime(log.created_at)}</span>
-                        </div>
-                      </div>
-
-                      <div className="log-badges">
-                        <span className="badge badge-sleep">💤 {log.sleep_hours}h</span>
-                        <span className={`badge badge-stress ${log.stress_level <= 2 ? 'low' : ''}`}>
-                          ⚡ Stress: {log.stress_level}
-                        </span>
-                        <span className="log-expand-icon">▼</span>
-                      </div>
-                    </div>
-
-                    {/* Expanded Details */}
-                    {openLogId === log.id && (
-                      <div className="log-details">
-                        <div className="log-notes-section">
-                          <span className="section-label">Your Thoughts</span>
-                          <p className="log-notes-text">{log.notes}</p>
-                        </div>
-
-                        {log.insights && (
-                          <div className="insight-box">
-                            <span className="section-label" style={{ color: '#8b5cf6', marginBottom: '8px', display: 'block' }}>
-                              🧠 AI Wellness Insight
-                            </span>
-                            <div
-                              className="markdown-content"
-                              dangerouslySetInnerHTML={{ __html: parseMarkdown(log.insights) }}
-                            />
-                          </div>
-                        )}
-
-                        <button
-                          className="log-delete-btn"
-                          onClick={(e) => handleDeleteLog(e, log.id)}
-                        >
-                          Delete Entry
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
+                <p className="compact-subtitle">Send a check-in to see the AI response here.</p>
               )}
             </div>
-
           </div>
-        </div>
+        ) : (
+          <div className="analysis-shell animate-fade">
+            <div className="glass-card">
+              <div className="compact-header" style={{ marginBottom: '12px' }}>
+                <div>
+                  <h2 className="card-title" style={{ marginBottom: '8px' }}>Analysis</h2>
+                  <p className="compact-subtitle">Summary, history, and weekly report are available here.</p>
+                </div>
+              </div>
+
+              <div className="analysis-toolbar">
+              <button type="button" className={analysisView === 'summary' ? 'btn-primary' : 'btn-secondary'} onClick={() => setAnalysisView('summary')}>Summary</button>
+              <button type="button" className={analysisView === 'history' ? 'btn-primary' : 'btn-secondary'} onClick={() => setAnalysisView('history')}>History</button>
+              <button type="button" className={analysisView === 'report' ? 'btn-primary' : 'btn-secondary'} onClick={() => setAnalysisView('report')}>Weekly report</button>
+            </div>
+            </div>
+
+            {analysisView === 'summary' && (
+              <div className="stats-summary" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                <div className="stat-item"><span className="stat-val">{logs.length ? (stats.avgMood || '-') : '—'}</span><span className="stat-label">Avg Mood</span></div>
+                <div className="stat-item"><span className="stat-val">{logs.length ? (stats.avgSleep ? `${stats.avgSleep}h` : '-') : '—'}</span><span className="stat-label">Avg Sleep</span></div>
+                <div className="stat-item"><span className="stat-val">{logs.length ? (stats.avgStress || '-') : '—'}</span><span className="stat-label">Avg Stress</span></div>
+                <div className="stat-item"><span className="stat-val">🔥 {logs.length ? streak : 0}</span><span className="stat-label">Streak</span></div>
+                <div className="stat-item" style={{ gridColumn: '1 / -1' }}>
+                  <span className="stat-val" style={{ fontSize: '1rem' }}>{logs.length ? 'Your analysis is ready.' : 'No entries yet'}</span>
+                  <span className="stat-label">{logs.length ? 'Use the tabs below for detail.' : 'Add a check-in to unlock trend analysis and weekly reports.'}</span>
+                </div>
+              </div>
+            )}
+
+            {analysisView === 'history' && (
+              <div className="glass-card">
+                <WellnessChart logs={logs} />
+                <div className="logs-section">
+                  <h3 className="card-title">History</h3>
+                  {logs.length === 0 ? (
+                    <div className="glass-card empty-logs-card"><p>No check-ins yet.</p></div>
+                  ) : (
+                    logs.map((log) => (
+                      <div key={log.id} className={`log-card ${openLogId === log.id ? 'open' : ''}`}>
+                        <div className="log-header" onClick={() => setOpenLogId(openLogId === log.id ? null : log.id)}>
+                          <div className="log-meta">
+                            <span className="log-mood-emoji">{moods.find((m) => m.rating === log.mood)?.emoji || '😐'}</span>
+                            <div className="log-date-wrapper">
+                              <span className="log-date">{formatDate(log.created_at)}</span>
+                              <span className="log-time">{formatTime(log.created_at)}</span>
+                            </div>
+                          </div>
+                          <div className="log-badges">
+                            <span className="badge badge-sleep">💤 {log.sleep_hours}h</span>
+                            <span className="badge badge-stress">⚡ {log.stress_level}</span>
+                          </div>
+                        </div>
+                        {openLogId === log.id && (
+                          <div className="log-details">
+                            <p className="log-notes-text">{log.notes}</p>
+                            {log.insights && <div className="markdown-content" dangerouslySetInnerHTML={{ __html: parseMarkdown(log.insights) }} />}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {analysisView === 'report' && (
+              <div className="glass-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <div>
+                    <h3 className="card-title" style={{ marginBottom: '8px' }}>Weekly wellness report</h3>
+                    <p className="compact-subtitle">Open the generated digest through a button click.</p>
+                  </div>
+                  <button type="button" className="btn-primary" onClick={handleGenerateReport}>Generate report</button>
+                </div>
+                <div style={{ marginTop: '16px' }}>
+                  {loadingReport ? (
+                    <p className="compact-subtitle">Compiling report...</p>
+                  ) : showReport && reportContent ? (
+                    <div className="markdown-content" dangerouslySetInnerHTML={{ __html: parseMarkdown(reportContent) }} />
+                  ) : (
+                    <div className="glass-card" style={{ padding: '16px' }}>
+                      <p className="compact-subtitle">Click “Generate report” to load the analysis here. If there are no check-ins yet, the backend returns a starter digest instead of an empty panel.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Settings Modal */}
@@ -608,6 +672,17 @@ function App() {
               <span className="form-help">
                 Your key is stored locally in your browser and used only to query the Gemini models. Leave empty to use the server's default configuration or the built-in wellness insights mock generator.
               </span>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Student Name</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Optional display name"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+              />
             </div>
 
             <div className="form-group" style={{ marginTop: '16px' }}>
@@ -665,6 +740,46 @@ function App() {
               </button>
               <button className="btn-primary" onClick={handleSaveApiKey}>
                 Save & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Weekly Report Modal */}
+      {showReport && (
+        <div className="modal-backdrop">
+          <div className="modal-content animate-fade" style={{ maxWidth: '650px', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">📈 Weekly Wellness Digest</h3>
+              <button className="close-btn" onClick={() => setShowReport(false)}>
+                &times;
+              </button>
+            </div>
+
+            <div style={{ padding: '8px 0', color: '#fff', fontSize: '0.9rem', lineHeight: '1.6' }}>
+              {loadingReport ? (
+                <div style={{ padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                  <span style={{ fontSize: '2rem', display: 'inline-block' }}>🌀</span>
+                  <span>Compiling your weekly report with Gemini AI...</span>
+                </div>
+              ) : (
+                <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                  {reportContent}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button 
+                className="btn-secondary" 
+                onClick={() => window.print()}
+                disabled={loadingReport || !reportContent}
+              >
+                🖨️ Print Digest
+              </button>
+              <button className="btn-primary" onClick={() => setShowReport(false)}>
+                Close
               </button>
             </div>
           </div>

@@ -33,6 +33,8 @@ class LogCreateRequest(BaseModel):
     sleep_hours: float = Field(..., ge=0.0, le=24.0)
     stress_level: int = Field(..., ge=1, le=5)
     notes: str
+    exam_type: Optional[str] = None
+    days_to_exam: Optional[int] = Field(default=None, ge=0)
 
 @app.get("/api/health")
 def health_check():
@@ -51,6 +53,9 @@ def get_config():
 class SpotifyCallbackRequest(BaseModel):
     code: str
     redirect_uri: str
+
+class SpotifyRefreshRequest(BaseModel):
+    refresh_token: str
 
 @app.post("/api/spotify/callback")
 def spotify_callback(request: SpotifyCallbackRequest):
@@ -81,6 +86,33 @@ def spotify_callback(request: SpotifyCallbackRequest):
             return response.json()
         else:
             raise HTTPException(status_code=response.status_code, detail=response.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/spotify/refresh")
+def spotify_refresh(request: SpotifyRefreshRequest):
+    client_id = os.environ.get("SPOTIFY_CLIENT_ID")
+    client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET")
+
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=500, detail="Spotify credentials are not configured on the server.")
+
+    token_url = "https://accounts.spotify.com/api/token"
+    auth_header = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("utf-8")
+    headers = {
+        "Authorization": f"Basic {auth_header}",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": request.refresh_token
+    }
+
+    try:
+        response = requests.post(token_url, headers=headers, data=data)
+        if response.ok:
+            return response.json()
+        raise HTTPException(status_code=response.status_code, detail=response.text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 class RetentionUpdateRequest(BaseModel):
@@ -114,6 +146,8 @@ def create_log(request: LogCreateRequest, x_gemini_api_key: Optional[str] = Head
         sleep_hours=request.sleep_hours,
         stress_level=request.stress_level,
         notes=request.notes,
+        exam_type=request.exam_type,
+        days_to_exam=request.days_to_exam,
         custom_api_key=x_gemini_api_key
     )
     
@@ -138,6 +172,33 @@ def delete_log(log_id: int):
         raise HTTPException(status_code=404, detail="Log not found")
     return {"status": "success", "message": f"Log {log_id} deleted"}
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+
+@app.post("/api/chat")
+def chat_companion(request: ChatRequest, x_gemini_api_key: Optional[str] = Header(None)):
+    msgs = [{"role": m.role, "content": m.content} for m in request.messages]
+    logs = db.get_logs(limit=5)
+    response_text = ai.generate_chat_response(
+        messages=msgs,
+        logs=logs,
+        custom_api_key=x_gemini_api_key
+    )
+    return {"response": response_text}
+
+@app.get("/api/reports/weekly")
+def get_weekly_report(x_gemini_api_key: Optional[str] = Header(None)):
+    logs = db.get_logs(limit=7)
+    report_markdown = ai.generate_weekly_report(
+        logs=logs,
+        custom_api_key=x_gemini_api_key
+    )
+    return {"report": report_markdown}
+
 # Serve frontend static files if dist folder exists (production build)
 if os.path.exists("dist"):
     from fastapi.staticfiles import StaticFiles
@@ -145,6 +206,6 @@ if os.path.exists("dist"):
 
 if __name__ == "__main__":
     import uvicorn
-    # Use standard host/port matching Cloud Run / local expectations
-    port = int(os.environ.get("PORT", 8001))
-    uvicorn.run("main:app", host="127.0.0.1", port=port, reload=True)
+    # Use a stable local dev server configuration without reload watchers.
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="127.0.0.1", port=port, reload=False)
