@@ -91,6 +91,7 @@ function App() {
 
   // Tabs and Report State
   const [activeTab, setActiveTab] = useState('chat');
+  const [analysisView, setAnalysisView] = useState('summary');
   const [showReport, setShowReport] = useState(false);
   const [reportContent, setReportContent] = useState('');
   const [loadingReport, setLoadingReport] = useState(false);
@@ -454,6 +455,23 @@ function App() {
           >
             📝 Check-in
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('analysis')}
+            style={{
+              background: activeTab === 'analysis' ? 'linear-gradient(135deg, #8b5cf6, #06b6d4)' : 'transparent',
+              border: 'none',
+              color: '#fff',
+              padding: '6px 16px',
+              borderRadius: '16px',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            📊 Analysis
+          </button>
         </div>
 
         <div className="nav-actions">
@@ -470,7 +488,9 @@ function App() {
 
       {/* Primary Body */}
       <main className="dashboard-container">
-        {activeTab === 'dashboard' ? (
+        {activeTab === 'chat' ? (
+          <CalmChat apiKey={apiKey} />
+        ) : activeTab === 'dashboard' ? (
           <div className="chat-shell animate-fade">
             <div className="glass-card">
               <div className="compact-header">
@@ -479,7 +499,7 @@ function App() {
                   <p className="compact-subtitle">Quick check-in. Minimal inputs. Direct support.</p>
                 </div>
                 <div className="compact-actions">
-                  <button type="button" className="btn-secondary" onClick={() => setActiveTab('chat')}>Open analysis</button>
+                  <button type="button" className="btn-secondary" onClick={() => setActiveTab('analysis')}>Open analysis</button>
                   <button type="button" className="btn-secondary" onClick={() => document.getElementById('spotify-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Spotify</button>
                 </div>
               </div>
