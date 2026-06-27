@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || (window.location.origin + '/api');
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://127.0.0.1:8001/api' 
+    : window.location.origin + '/api');
 
 // A simple and robust Markdown-to-HTML parser function to render wellness insights beautifully
 const parseMarkdown = (text) => {

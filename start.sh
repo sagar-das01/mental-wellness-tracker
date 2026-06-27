@@ -8,7 +8,7 @@ echo "🌱 Starting CalmMind Mental Wellness Tracker..."
 # 1. Start Python FastAPI Backend using the root virtualenv
 echo "🚀 Launching Backend API on http://127.0.0.1:8000..."
 cd backend
-../.venv/bin/python main.py &
+../../.venv/bin/python main.py &
 BACKEND_PID=$!
 cd ..
 
