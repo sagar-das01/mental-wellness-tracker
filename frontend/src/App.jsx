@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import WellnessChart from './components/WellnessChart';
 import AmbientPlayer from './components/AmbientPlayer';
+import SpotifyPlayer from './components/SpotifyPlayer';
 
 const REFLECTION_PROMPTS = [
   "What is one small thing that brought you peace or joy today?",
@@ -428,6 +429,9 @@ function App() {
 
             {/* Ambient Soundscapes */}
             <AmbientPlayer />
+
+            {/* Spotify Player */}
+            <SpotifyPlayer currentMood={mood} currentStress={stressLevel} />
 
             {/* Check-In History Logs */}
             <div className="logs-section">
