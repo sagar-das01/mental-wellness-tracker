@@ -40,6 +40,12 @@ def health_check():
         "database_type": "PostgreSQL" if db.IS_POSTGRES else "SQLite"
     }
 
+@app.get("/api/config")
+def get_config():
+    return {
+        "spotify_client_id": os.environ.get("SPOTIFY_CLIENT_ID", "")
+    }
+
 @app.get("/api/logs")
 def list_logs():
     return db.get_logs()

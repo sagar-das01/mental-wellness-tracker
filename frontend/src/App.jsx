@@ -87,17 +87,31 @@ function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [openLogId, setOpenLogId] = useState(null);
 
-  // Statistics and Prompts
+  // Statistics, Prompts, and Config
   const [stats, setStats] = useState({ avgMood: 0, avgSleep: 0, avgStress: 0 });
   const [streak, setStreak] = useState(0);
   const [promptIdx, setPromptIdx] = useState(0);
+  const [spotifyClientId, setSpotifyClientId] = useState('');
 
   useEffect(() => {
     checkHealth();
     fetchLogs();
+    fetchConfig();
     // Randomize initial journal prompt
     setPromptIdx(Math.floor(Math.random() * REFLECTION_PROMPTS.length));
   }, []);
+
+  const fetchConfig = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/config`);
+      if (res.ok) {
+        const data = await res.json();
+        setSpotifyClientId(data.spotify_client_id);
+      }
+    } catch (e) {
+      console.error('Failed to fetch config:', e);
+    }
+  };
 
   useEffect(() => {
     calculateStats(logs);
@@ -431,7 +445,7 @@ function App() {
             <AmbientPlayer />
 
             {/* Spotify Player */}
-            <SpotifyPlayer currentMood={mood} currentStress={stressLevel} showToast={showToast} />
+            <SpotifyPlayer currentMood={mood} currentStress={stressLevel} showToast={showToast} spotifyClientId={spotifyClientId} />
 
             {/* Check-In History Logs */}
             <div className="logs-section">

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
-export default function SpotifyPlayer({ currentMood, currentStress, showToast }) {
+export default function SpotifyPlayer({ currentMood, currentStress, showToast, spotifyClientId }) {
   const [token, setToken] = useState(() => localStorage.getItem('spotify_access_token') || '');
-  const [clientId, setClientId] = useState(() => localStorage.getItem('spotify_client_id') || '');
   const [currentTrack, setCurrentTrack] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,12 +40,11 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast })
   }, [token]);
 
   const handleConnect = () => {
-    if (!clientId.trim()) {
-      setErrorMsg('Please enter a Spotify Client ID to authenticate.');
+    if (!spotifyClientId) {
+      setErrorMsg('Spotify Integration is not configured on the backend. Please add SPOTIFY_CLIENT_ID to your .env file.');
       return;
     }
     setErrorMsg('');
-    localStorage.setItem('spotify_client_id', clientId);
 
     const redirectUri = window.location.origin + '/';
     const scopes = [
@@ -56,7 +54,7 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast })
     ].join('%20');
 
     // Redirect to Spotify Auth page
-    window.location.href = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}`;
+    window.location.href = `https://accounts.spotify.com/authorize?client_id=${spotifyClientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}`;
   };
 
   const handleDisconnect = () => {
@@ -167,20 +165,12 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast })
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             Connect your personal Spotify account to control your playback and play soothing wellness playlists directly from the app.
           </div>
-          
-          <div className="form-group" style={{ margin: 0 }}>
-            <input
-              type="text"
-              className="form-textarea"
-              style={{ minHeight: '36px', height: '36px', padding: '6px 12px', fontSize: '0.8rem', margin: 0 }}
-              placeholder="Paste your Spotify Client ID..."
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-            />
-            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Add Redirect URI `http://localhost:5174/` (or your current origin) in your Spotify Developer Dashboard.
-            </span>
-          </div>
+
+          {!spotifyClientId && (
+            <div style={{ color: '#f59e0b', fontSize: '0.75rem', fontWeight: 600, padding: '10px', background: 'rgba(245, 158, 11, 0.05)', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+              ⚠️ Spotify Client ID is not configured on this server. Add SPOTIFY_CLIENT_ID to your local .env file.
+            </div>
+          )}
 
           {errorMsg && <div style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 600 }}>⚠️ {errorMsg}</div>}
 
@@ -188,6 +178,7 @@ export default function SpotifyPlayer({ currentMood, currentStress, showToast })
             type="button" 
             onClick={handleConnect}
             className="submit-btn" 
+            disabled={!spotifyClientId}
             style={{ margin: 0, padding: '8px', fontSize: '0.85rem', background: '#1DB954' }}
           >
             Connect Spotify Account
