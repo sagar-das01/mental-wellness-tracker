@@ -1,0 +1,11 @@
+Updated Features
+
+1. Conversation-first landing screen with the chat as the default experience.
+2. Check-in flow kept as a secondary action for structured wellness logging.
+3. Analysis tab with summary, history, and weekly report views.
+4. Spotify connect flow with persisted session tokens and refresh support.
+5. Backend Spotify refresh endpoint for retained authorization.
+6. Weekly report fallback that shows a visible starter analysis when no logs exist.
+7. Wellness insight generation with crisis-aware trigger handling.
+8. Backend tests for trigger detection, crisis response, and weekly analysis.
+9. UI contrast and layout fixes to keep the app visible and readable.

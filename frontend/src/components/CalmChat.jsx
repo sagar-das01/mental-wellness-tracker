@@ -71,7 +71,7 @@ export default function CalmChat({ apiKey }) {
   };
 
   return (
-    <div className="glass-card animate-fade" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', minHeight: '500px', padding: '20px' }}>
+    <div className="glass-card animate-fade" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', minHeight: '500px', padding: '20px', color: 'var(--text-primary)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '16px' }}>
         <span style={{ fontSize: '1.5rem' }}>🤖</span>
         <div>
@@ -80,8 +80,15 @@ export default function CalmChat({ apiKey }) {
         </div>
       </div>
 
+      <div style={{ marginBottom: '14px', padding: '12px 14px', border: '1px solid var(--border-color)', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>
+        <div style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>Start here</div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          Send a short message, tap one of the examples, or ask for a grounding exercise.
+        </div>
+      </div>
+
       {/* Messages Stream */}
-      <div style={{ flex: 1, overflowY: 'auto', paddingRight: '6px', display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '16px' }}>
+      <div style={{ flex: 1, minHeight: '280px', overflowY: 'auto', paddingRight: '6px', display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '16px' }}>
         {messages.map((msg, idx) => (
           <div
             key={idx}
@@ -134,12 +141,12 @@ export default function CalmChat({ apiKey }) {
           e.preventDefault();
           handleSend();
         }}
-        style={{ display: 'flex', gap: '10px' }}
+        style={{ display: 'flex', gap: '10px', alignItems: 'center' }}
       >
         <input
           type="text"
           className="form-textarea"
-          style={{ minHeight: '44px', height: '44px', padding: '10px 16px', fontSize: '0.85rem', flex: 1, margin: 0, borderRadius: '22px' }}
+          style={{ minHeight: '44px', height: '44px', padding: '10px 16px', fontSize: '0.85rem', flex: 1, margin: 0, borderRadius: '22px', color: '#fff', backgroundColor: 'rgba(255,255,255,0.06)' }}
           placeholder="Type your message..."
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
