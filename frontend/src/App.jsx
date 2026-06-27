@@ -431,7 +431,7 @@ function App() {
             <AmbientPlayer />
 
             {/* Spotify Player */}
-            <SpotifyPlayer currentMood={mood} currentStress={stressLevel} />
+            <SpotifyPlayer currentMood={mood} currentStress={stressLevel} showToast={showToast} />
 
             {/* Check-In History Logs */}
             <div className="logs-section">
