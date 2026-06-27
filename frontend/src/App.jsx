@@ -240,10 +240,6 @@ function App() {
         </div>
 
         <div className="nav-actions">
-          <div className="status-tag">
-            <span className={`status-dot ${apiKey ? 'active' : 'inactive'}`}></span>
-            <span>{apiKey ? 'API Active' : 'Fallback Mock Mode'}</span>
-          </div>
           <button className="btn-icon" onClick={() => setShowSettings(true)}>
             ⚙️
           </button>
